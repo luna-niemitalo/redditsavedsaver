@@ -8,6 +8,10 @@ import os
 
 token = ""
 
+def log(string):
+    file = open("data/log.txt", "a+")
+    file.write(string + "\n")
+    file.close()
 
 def main():
     client_auth = requests.auth.HTTPBasicAuth('***REMOVED***', '***REMOVED***')
@@ -42,6 +46,7 @@ def getAllSaved():
     global token
     results = []
     after = ""
+    log("Getting all saved items...")
     while after is not None:
         time.sleep(1)
         headers = {"Authorization": "bearer " + token,
@@ -50,7 +55,6 @@ def getAllSaved():
         response.json()
         after = response.json()["data"]["after"]
         filtered = filterSaved(response.json())
-        print(after)
         for fitem in filtered:
             results.append(fitem)
     return results
@@ -100,7 +104,20 @@ class SaveFileManager:
         return self.save_object
 
 
+def verify():
+    try:
+        test_file = "./savedImages/verify"
+        f = open(test_file, "w+")
+        f.close()
+        os.remove(test_file)
+        return True
+    except:
+        return False
+
 def createFileDirs():
+    if verify():
+        return True
+
     # define the name of the directory to be created
     path = "./savedImages"
     path2 = "./data"
@@ -111,46 +128,43 @@ def createFileDirs():
     try:
         os.mkdir(path, access_rights)
     except OSError:
-        print("Creation of the directory %s failed" % path)
+        log("Creation of the directory %s failed" % path)
+        return False
     else:
-        print("Successfully created the directory %s" % path)
+        log("Successfully created the directory %s" % path)
+        if not verify():
+            return False
 
     try:
         os.mkdir(path2, access_rights)
     except OSError:
-        print("Creation of the directory %s failed" % path2)
+        log("Creation of the directory %s failed" % path2)
     else:
-        print("Successfully created the directory %s" % path2)
+        log("Successfully created the directory %s" % path2)
 
-    try:
-        test_file = "./savedImages/verify"
-        f = open(test_file, "w+")
-        f.close()
-        os.remove(test_file)
+    if verify():
         return True
-    except:
-        return False
+    return False
 
 
 def downloadItem(item, existings=[]):
     if item not in existings:
-        print("Downloading " + item["id"])
+        log("Downloading " + item["id"])
         try:
             r = requests.get(item["url"], allow_redirects=True)
             extension = mimetypes.guess_extension(r.headers["content-type"])
             if not extension:
-                print("NO EXTENSION DETECTED!!")
-                print(extension)
-                print(r)
+                log("NO EXTENSION DETECTED!!")
+                log(r)
                 return False
             file = open("./savedImages/" + item["id"] + extension, 'wb')
             file.write(r.content)
             file.close()
-            print("./savedImages/" + item["id"] + extension + " Created...")
+            log("./savedImages/" + item["id"] + extension + " Created...")
             return item
         except Exception as e:
-            print(e)
-            print("Error downloading " + item["id"])
+            log(str(e))
+            log("Error downloading " + item["id"])
             return False
 
 def firstRun(SFM):
@@ -183,5 +197,5 @@ if __name__ == "__main__":
             count += 1
     SFM.pushArrToSaved(filtered_items)
     SFM.setSaveObj()
-    print("Downloaded " + str(count) + " items...")
+    log("Downloaded " + str(count) + " items...")
 
