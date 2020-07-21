@@ -5,11 +5,13 @@ import requests
 import requests.auth
 import json
 import os
+from datetime import datetime
 
 token = ""
+currentFolder = os.path.dirname(os.path.abspath(os.path.realpath(__file__)))
 
 def log(string):
-    file = open("data/log.txt", "a+")
+    file = open(currentFolder + "/data/log.txt", "a+")
     file.write(string + "\n")
     file.close()
 
@@ -77,7 +79,7 @@ class SaveFileManager:
 
     def getSaveObj(self):
         try:
-            fp = open("data/save.json")
+            fp = open(currentFolder + "/data/save.json")
             result = fp.read()
             save_data = json.loads(result)
             self.save_object = save_data
@@ -86,7 +88,7 @@ class SaveFileManager:
             print("No file, or empty file")
 
     def setSaveObj(self):
-        fp = open("data/save.json", "w+")
+        fp = open(currentFolder + "/data/save.json", "w+")
         json_string = json.dumps(self.save_object)
         fp.write(json_string)
         fp.close()
@@ -106,7 +108,7 @@ class SaveFileManager:
 
 def verify():
     try:
-        test_file = "./savedImages/verify"
+        test_file = currentFolder + "/savedImages/verify"
         f = open(test_file, "w+")
         f.close()
         os.remove(test_file)
@@ -119,8 +121,8 @@ def createFileDirs():
         return True
 
     # define the name of the directory to be created
-    path = "./savedImages"
-    path2 = "./data"
+    path = currentFolder + "/savedImages"
+    path2 = currentFolder + "/data"
 
     # define the access rights
     access_rights = 0o755
@@ -148,6 +150,7 @@ def createFileDirs():
 
 
 def downloadItem(item, existings=[]):
+    global currentFolder
     if item not in existings:
         log("Downloading " + item["id"])
         try:
@@ -157,10 +160,10 @@ def downloadItem(item, existings=[]):
                 log("NO EXTENSION DETECTED!!")
                 log(r)
                 return False
-            file = open("./savedImages/" + item["id"] + extension, 'wb')
+            file = open(currentFolder + "/savedImages/" + item["id"] + extension, 'wb')
             file.write(r.content)
             file.close()
-            log("./savedImages/" + item["id"] + extension + " Created...")
+            log(currentFolder + "/savedImages/" + item["id"] + extension + " Created...")
             return item
         except Exception as e:
             log(str(e))
@@ -168,10 +171,11 @@ def downloadItem(item, existings=[]):
             return False
 
 def firstRun(SFM):
+    global currentFolder
     try:
-        open("data/verify").close()
+        open(currentFolder + "/data/verify").close()
     except:
-        open("data/verify", "x")
+        open(currentFolder + "/data/verify", "x")
         filtered = getAllSaved()
         downloaded_items = SFM.getSave()
         for fitem in filtered:
@@ -180,6 +184,7 @@ def firstRun(SFM):
                 SFM.pushObjToSaved(result)
 
 if __name__ == "__main__":
+    log("[" + str(datetime.now()) + "] Running script...")
     SFM = SaveFileManager()
     # execute only if run as a script
     if not createFileDirs():
