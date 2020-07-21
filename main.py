@@ -43,7 +43,7 @@ def getAllSaved():
     results = []
     after = ""
     while after is not None:
-        time.sleep(2)
+        time.sleep(1)
         headers = {"Authorization": "bearer " + token,
                    "User-Agent": "Test custom user agent by ***REMOVED***"}
         response = requests.get("https://oauth.reddit.com/user/***REMOVED***/saved" + "?count=25&after=" + after, headers=headers)
@@ -59,8 +59,9 @@ def filterSaved(saved_items):
     result = []
     for item in saved_items["data"]["children"]:
         image_obj = {
-            "name": item["data"]["name"],
-            "url": item["data"]["url"]
+            "name": item["data"]["id"],
+            "url": item["data"]["url"],
+            "permalink": item["data"]["permalink"],
         }
         result.append(image_obj)
     return result
