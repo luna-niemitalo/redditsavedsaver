@@ -134,7 +134,7 @@ def createFileDirs():
 
 def downloadItem(item, existings=[]):
     if item not in existings:
-        print("Downloading " + item["name"])
+        print("Downloading " + item["id"])
         try:
             r = requests.get(item["url"], allow_redirects=True)
             extension = mimetypes.guess_extension(r.headers["content-type"])
