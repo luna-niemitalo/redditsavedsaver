@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import mimetypes
-
+import time
 import requests
 import requests.auth
 import json
@@ -30,13 +30,31 @@ def getExample():
 
 
 def getSaved():
-    global token
     headers = {"Authorization": "bearer " + token,
-               "User-Agent": "Test custom user agent by ***REMOVED***",
-               "sort": "new"}
-    response = requests.get("https://oauth.reddit.com/user/***REMOVED***/saved", headers=headers)
-    return response.json()
+               "User-Agent": "Test custom user agent by ***REMOVED***"}
+    response = requests.get("https://oauth.reddit.com/user/***REMOVED***/saved" + "?count=25&sort=new",
+                            headers=headers)
+    response.json()
+    filtered = filterSaved(response.json())
+    return filtered
 
+def getAllSaved(SFM):
+    global token
+    results = []
+    after = ""
+    existing = SFM.getSave()
+    while after is not None:
+        time.sleep(2)
+        headers = {"Authorization": "bearer " + token,
+                   "User-Agent": "Test custom user agent by ***REMOVED***"}
+        response = requests.get("https://oauth.reddit.com/user/***REMOVED***/saved" + "?count=25&after=" + after, headers=headers)
+        response.json()
+        after = response.json()["data"]["after"]
+        filtered = filterSaved(response.json())
+        for fitem in filtered:
+            if fitem not in existing:
+                results.append(fitem)
+    return results
 
 def filterSaved(saved_items):
     result = []
@@ -135,14 +153,15 @@ if __name__ == "__main__":
         exit(1)
     main()
     # getExample()
-    saved_items = getSaved()
+    filtered_items = getSaved()
     downloaded_items = SFM.getSave()
-    filtered_items = filterSaved(saved_items)
+    count = 0
     for fitem in filtered_items:
         result = downloadItem(fitem, downloaded_items)
         if result:
             SFM.pushObjToSaved(result)
-    # SFM.pushArrToSaved(filtered_items)
-    print(SFM.getSave())
+            count += 1
+    SFM.pushArrToSaved(filtered_items)
     SFM.setSaveObj()
+    print("Downloaded " + str(count) + " items...")
 
