@@ -38,11 +38,10 @@ def getSaved():
     filtered = filterSaved(response.json())
     return filtered
 
-def getAllSaved(SFM):
+def getAllSaved():
     global token
     results = []
     after = ""
-    existing = SFM.getSave()
     while after is not None:
         time.sleep(2)
         headers = {"Authorization": "bearer " + token,
@@ -51,9 +50,9 @@ def getAllSaved(SFM):
         response.json()
         after = response.json()["data"]["after"]
         filtered = filterSaved(response.json())
+        print(after)
         for fitem in filtered:
-            if fitem not in existing:
-                results.append(fitem)
+            results.append(fitem)
     return results
 
 def filterSaved(saved_items):
@@ -73,7 +72,7 @@ class SaveFileManager:
 
     def getSaveObj(self):
         try:
-            fp = open("save.json")
+            fp = open("data/save.json")
             result = fp.read()
             save_data = json.loads(result)
             self.save_object = save_data
@@ -82,7 +81,7 @@ class SaveFileManager:
             print("No file, or empty file")
 
     def setSaveObj(self):
-        fp = open("save.json", "w+")
+        fp = open("data/save.json", "w+")
         json_string = json.dumps(self.save_object)
         fp.write(json_string)
         fp.close()
@@ -100,9 +99,10 @@ class SaveFileManager:
         return self.save_object
 
 
-def createFileDir():
+def createFileDirs():
     # define the name of the directory to be created
     path = "./savedImages"
+    path2 = "./data"
 
     # define the access rights
     access_rights = 0o755
@@ -115,6 +115,13 @@ def createFileDir():
         print("Successfully created the directory %s" % path)
 
     try:
+        os.mkdir(path2, access_rights)
+    except OSError:
+        print("Creation of the directory %s failed" % path2)
+    else:
+        print("Successfully created the directory %s" % path2)
+
+    try:
         test_file = "./savedImages/verify"
         f = open(test_file, "w+")
         f.close()
@@ -124,8 +131,8 @@ def createFileDir():
         return False
 
 
-def downloadItem(item, list):
-    if item not in list:
+def downloadItem(item, existings=[]):
+    if item not in existings:
         print("Downloading " + item["name"])
         try:
             r = requests.get(item["url"], allow_redirects=True)
@@ -134,7 +141,7 @@ def downloadItem(item, list):
                 print("NO EXTENSION DETECTED!!")
                 print(extension)
                 print(r)
-                extension = ""
+                return False
             file = open("./savedImages/" + item["name"] + extension, 'wb')
             file.write(r.content)
             file.close()
@@ -145,13 +152,25 @@ def downloadItem(item, list):
             print("Error downloading " + item["name"])
             return False
 
+def firstRun(SFM):
+    try:
+        open("data/verify").close()
+    except:
+        open("data/verify", "x")
+        filtered = getAllSaved()
+        downloaded_items = SFM.getSave()
+        for fitem in filtered:
+            result = downloadItem(fitem, downloaded_items)
+            if result:
+                SFM.pushObjToSaved(result)
 
 if __name__ == "__main__":
     SFM = SaveFileManager()
     # execute only if run as a script
-    if not createFileDir():
+    if not createFileDirs():
         exit(1)
     main()
+    firstRun(SFM)
     # getExample()
     filtered_items = getSaved()
     downloaded_items = SFM.getSave()
