@@ -59,7 +59,7 @@ def filterSaved(saved_items):
     result = []
     for item in saved_items["data"]["children"]:
         image_obj = {
-            "name": item["data"]["id"],
+            "id": item["data"]["id"],
             "url": item["data"]["url"],
             "permalink": item["data"]["permalink"],
         }
@@ -143,14 +143,14 @@ def downloadItem(item, existings=[]):
                 print(extension)
                 print(r)
                 return False
-            file = open("./savedImages/" + item["name"] + extension, 'wb')
+            file = open("./savedImages/" + item["id"] + extension, 'wb')
             file.write(r.content)
             file.close()
-            print("./savedImages/" + item["name"] + extension + " Created...")
+            print("./savedImages/" + item["id"] + extension + " Created...")
             return item
         except Exception as e:
             print(e)
-            print("Error downloading " + item["name"])
+            print("Error downloading " + item["id"])
             return False
 
 def firstRun(SFM):
