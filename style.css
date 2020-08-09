@@ -1,0 +1,20 @@
+#masonry {
+    display: grid;
+    grid-template-rows: masonry;
+    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+    gap: 1rem;
+}
+
+img {
+    width: 100%;
+    display: block;
+    border-radius: 0 0 1rem 1rem;
+}
+
+figcaption {
+    padding: 0.5rem 1rem 0.4rem;
+    background: #ddd;
+    color: #333;
+    border-radius: 1rem 1rem 0 0;
+    text-align: end;
+}

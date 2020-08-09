@@ -1,0 +1,13 @@
+version: '2'
+services:
+    front:
+        build: .
+        container_name: reddit-saver
+        volumes:
+            - .:/var/www/html/
+            - ./php-ini:/usr/local/etc/php/custom.d
+        environment:
+            PHP_INI_SCAN_DIR: "/usr/local/etc/php/custom.d:/usr/local/etc/php/conf.d"
+            XDEBUG_CONFIG: remote_host=192.168.1.107
+        ports:
+            - "8888:80"
