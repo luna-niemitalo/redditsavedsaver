@@ -68,6 +68,7 @@ def filterSaved(saved_items):
             "id": item["data"]["id"],
             "url": item["data"]["url"],
             "permalink": item["data"]["permalink"],
+            "ts": time.time(),
         }
         result.append(image_obj)
     return result
