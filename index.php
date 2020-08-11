@@ -14,7 +14,11 @@ $files = include("./api/getData.php")
     integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0="
     crossorigin="anonymous"></script>
 <script type="text/javascript">
-    const data = <?php echo($files)?>;
+    const dataObj = <?php echo($files)?>;
+    const data = []
+    for (const value in dataObj) {
+        data.push(value);
+    }
     function imgclick(id) {
         target = "/api/getImage.php?id=" + id;
         window.location.href=target;
