@@ -29,7 +29,7 @@ $files = include("./api/getData.php")
         data.forEach(value => {
         const elementString = `
             <figure>
-                <figcaption>${value.id}</figcaption>
+                <figcaption><a href="https://www.reddit.com${value.permalink}">${value.id}</a></figcaption>
                 <img src="${"/api/getImage.php?id=" + value.id}" onclick="imgclick('${value.id}')">
             </figure>`;
             const element = $.parseHTML( elementString );
