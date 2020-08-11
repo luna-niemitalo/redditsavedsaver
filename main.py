@@ -5,6 +5,7 @@ import requests
 import requests.auth
 import json
 import os
+import sys
 import sqlite3
 from sqlite3 import Error
 from datetime import datetime
@@ -193,7 +194,14 @@ if __name__ == "__main__":
     main()
     firstRun(SFM)
     # getExample()
-    filtered_items = getSaved()
+    if len(sys.argv) >= 2:
+        if sys.argv[1] == "1":
+            filtered_items =getAllSaved()
+        else:
+            filtered_items = getSaved()
+    else:
+        filtered_items = getSaved()
+
     downloaded_items = SFM.getSave()
     count = 0
     for fitem in filtered_items:
