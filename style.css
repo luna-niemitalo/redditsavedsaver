@@ -1,11 +1,14 @@
 .container {
     display: grid;
-    grid-template-rows: masonry;
-    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
-}
-#masonrys {
-    display:flex;
-    flex-direction: column;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-gap: 10px;
+    grid-auto-rows: minmax(180px, auto);
+    grid-auto-flow: dense;
+    padding: 10px;
+
+    //display: grid;
+    //grid-template-rows: masonry;
+    //grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
 }
 
 img {
