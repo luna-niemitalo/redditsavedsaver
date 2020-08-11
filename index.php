@@ -45,7 +45,7 @@ $files = include("./api/getData.php")
             a.ts = -10000000000000000;
         }
 
-        return a.ts - b.ts;
+        return b.ts - a.ts;
     });
 
     var chucks = [];
