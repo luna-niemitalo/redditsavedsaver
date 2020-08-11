@@ -5,6 +5,8 @@ import requests
 import requests.auth
 import json
 import os
+import sqlite3
+from sqlite3 import Error
 from datetime import datetime
 
 token = ""
@@ -40,7 +42,6 @@ def getSaved():
                "User-Agent": "Test custom user agent by ***REMOVED***"}
     response = requests.get("https://oauth.reddit.com/user/***REMOVED***/saved" + "?count=25&sort=new",
                             headers=headers)
-    response.json()
     filtered = filterSaved(response.json())
     return filtered
 
@@ -68,14 +69,14 @@ def filterSaved(saved_items):
             "id": item["data"]["id"],
             "url": item["data"]["url"],
             "permalink": item["data"]["permalink"],
-            "ts": time.time(),
+            "ts": item["data"]["created_utc"],
         }
         result.append(image_obj)
     return result
 
 class SaveFileManager:
     def __init__(self):
-        self.save_object = []
+        self.save_object = {}
         self.getSaveObj()
 
     def getSaveObj(self):
@@ -96,12 +97,11 @@ class SaveFileManager:
 
     def pushArrToSaved(self, filtered_items):
         for item in filtered_items:
-            if item not in self.save_object:
-                self.save_object.append(item)
+            self.save_object[item["id"]] = item
+
 
     def pushObjToSaved(self, obj):
-        if obj not in self.save_object:
-            self.save_object.append(obj)
+        self.save_object[obj["id"]] = obj
 
     def getSave(self):
         return self.save_object
@@ -150,9 +150,9 @@ def createFileDirs():
     return False
 
 
-def downloadItem(item, existings=[]):
+def downloadItem(item, existings={}):
     global currentFolder
-    if item not in existings:
+    if item["id"] not in existings:
         log("Downloading " + item["id"])
         try:
             r = requests.get(item["url"], allow_redirects=True)
@@ -204,4 +204,3 @@ if __name__ == "__main__":
     SFM.pushArrToSaved(filtered_items)
     SFM.setSaveObj()
     log("Downloaded " + str(count) + " items...")
-
