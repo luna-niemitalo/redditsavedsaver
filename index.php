@@ -16,7 +16,7 @@ $files = include("./api/getData.php")
 <script type="text/javascript">
     const dataObj = <?php echo($files)?>;
     const data = []
-    for (const value of dataObj) {
+    for (const value of Object.values(dataObj)) {
         data.push(value);
     }
     function imgclick(id) {
