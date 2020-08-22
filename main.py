@@ -202,7 +202,7 @@ def firstRun(SFM):
 if __name__ == "__main__":
     log("[" + str(datetime.now()) + "] Running script...")
     SFM = SaveFileManager("/data/save.json")
-    SFM.getSaveObj()
+    downloaded_items = SFM.getSaveObj()
     confManager = SaveFileManager("/data/config.json")
     config = confManager.getSaveObj()
     if 'path' in config:
@@ -227,7 +227,6 @@ if __name__ == "__main__":
     else:
         filtered_items = getSaved()
 
-    downloaded_items = SFM.getSave()
     count = 0
     for fitem in filtered_items:
         result = downloadItem(fitem, downloaded_items)
