@@ -9,19 +9,29 @@ import sys
 import sqlite3
 from sqlite3 import Error
 from datetime import datetime
+from inspect import currentframe, getframeinfo
 
 token = ""
 currentFolder = os.path.dirname(os.path.abspath(os.path.realpath(__file__)))
+useTarget = False
+targetFolder = ""
+
+
+def get_linenumber():
+    cf = currentframe()
+    return "Line: " + str(cf.f_back.f_lineno) + " "
+
 
 def log(string):
     file = open(currentFolder + "/data/log.txt", "a+")
     file.write(string + "\n")
     file.close()
 
-def main():
-    client_auth = requests.auth.HTTPBasicAuth('***REMOVED***', '***REMOVED***')
-    post_data = {"grant_type": "password", "username": "***REMOVED***", "password": "***REMOVED***"}
-    headers = {"User-Agent": "Test custom user agent by ***REMOVED***"}
+
+def main(config):
+    client_auth = requests.auth.HTTPBasicAuth(config["HTTPBasicAuth1"], config["HTTPBasicAuth2"])
+    post_data = {"grant_type": "password", "username": config["username"], "password": config["password"]}
+    headers = {"User-Agent": config["User-Agent"]}
     response = requests.post("https://www.reddit.com/api/v1/access_token",
                              auth=client_auth,
                              data=post_data,
@@ -31,7 +41,6 @@ def main():
 
 
 def getExample():
-    global token
     headers = {"Authorization": "bearer " + token,
                "User-Agent": "Test custom user agent by ***REMOVED***"}
     response = requests.get("https://oauth.reddit.com/api/v1/me", headers=headers)
@@ -47,7 +56,6 @@ def getSaved():
     return filtered
 
 def getAllSaved():
-    global token
     results = []
     after = ""
     log("Getting all saved items...")
@@ -66,6 +74,10 @@ def getAllSaved():
 def filterSaved(saved_items):
     result = []
     for item in saved_items["data"]["children"]:
+        #try: 
+            #if item["data"]["is_gallery"] == "true":
+                #log(get_linenumber() + json.dumps(item))
+        #finally:
         image_obj = {
             "id": item["data"]["id"],
             "url": item["data"]["url"],
@@ -76,22 +88,23 @@ def filterSaved(saved_items):
     return result
 
 class SaveFileManager:
-    def __init__(self):
+    def __init__(self, filePath):
         self.save_object = {}
-        self.getSaveObj()
+        self.file_path = filePath
 
     def getSaveObj(self):
         try:
-            fp = open(currentFolder + "/data/save.json")
+            fp = open(currentFolder + self.file_path)
             result = fp.read()
             save_data = json.loads(result)
             self.save_object = save_data
             fp.close()
         except:
             print("No file, or empty file")
+        return self.save_object
 
     def setSaveObj(self):
-        fp = open(currentFolder + "/data/save.json", "w+")
+        fp = open(currentFolder + self.file_path, "w+")
         json_string = json.dumps(self.save_object)
         fp.write(json_string)
         fp.close()
@@ -101,16 +114,13 @@ class SaveFileManager:
             self.save_object[item["id"]] = item
 
 
-    def pushObjToSaved(self, obj):
-        self.save_object[obj["id"]] = obj
-
-    def getSave(self):
-        return self.save_object
+    def pushObjToSaved(self, name, obj):
+        self.save_object[name] = obj
 
 
-def verify():
+def verify(folder):
     try:
-        test_file = currentFolder + "/savedImages/verify"
+        test_file = folder + "/savedImages/verify"
         f = open(test_file, "w+")
         f.close()
         os.remove(test_file)
@@ -118,85 +128,100 @@ def verify():
     except:
         return False
 
-def createFileDirs():
-    if verify():
+
+def createFileDirs(config):
+    if useTarget:
+        target_folder = targetFolder
+    else:
+        target_folder = currentFolder
+    if verify(target_folder):
         return True
 
-    # define the name of the directory to be created
-    path = currentFolder + "/savedImages"
+    # define the name of the directory to be created,
+    path = target_folder + "/savedImages"
     path2 = currentFolder + "/data"
 
     # define the access rights
     access_rights = 0o755
 
     try:
-        os.mkdir(path, access_rights)
+        os.makedirs(path, access_rights)
     except OSError:
-        log("Creation of the directory %s failed" % path)
+
+        log(get_linenumber() + "Creation of the directory %s failed" % path)
         return False
     else:
-        log("Successfully created the directory %s" % path)
-        if not verify():
+        log(get_linenumber() + "Successfully created the directory %s" % path)
+        if not verify(target_folder):
             return False
 
     try:
         os.mkdir(path2, access_rights)
     except OSError:
-        log("Creation of the directory %s failed" % path2)
+        log(get_linenumber() + "Creation of the directory %s failed" % path2)
     else:
-        log("Successfully created the directory %s" % path2)
+        log(get_linenumber() + "Successfully created the directory %s" % path2)
 
-    if verify():
+    if verify(target_folder):
         return True
     return False
 
 
 def downloadItem(item, existings={}):
-    global currentFolder
+    if useTarget:
+        target_folder = targetFolder
+    else:
+        target_folder = currentFolder
+
     if item["id"] not in existings:
         log("Downloading " + item["id"])
         try:
             r = requests.get(item["url"], allow_redirects=True)
             extension = mimetypes.guess_extension(r.headers["content-type"])
             if not extension:
-                log("NO EXTENSION DETECTED!!")
-                log(r)
+                log(get_linenumber() + "NO EXTENSION DETECTED!!")
+                log(get_linenumber() + r.json())
                 return False
-            file = open(currentFolder + "/savedImages/" + item["id"] + extension, 'wb')
+            file = open(target_folder + "/savedImages/" + item["id"] + extension, 'wb')
             file.write(r.content)
             file.close()
-            log(currentFolder + "/savedImages/" + item["id"] + extension + " Created...")
+            log(target_folder + "/savedImages/" + item["id"] + extension + " Created...")
             return item
         except Exception as e:
             log(str(e))
-            log("Error downloading " + item["id"])
+            log(get_linenumber() + "Error downloading " + item["id"])
             return False
 
 def firstRun(SFM):
-    global currentFolder
     try:
         open(currentFolder + "/data/verify").close()
     except:
         open(currentFolder + "/data/verify", "x")
-        filtered = getAllSaved()
-        downloaded_items = SFM.getSave()
-        for fitem in filtered:
-            result = downloadItem(fitem, downloaded_items)
-            if result:
-                SFM.pushObjToSaved(result)
+
 
 if __name__ == "__main__":
     log("[" + str(datetime.now()) + "] Running script...")
-    SFM = SaveFileManager()
+    SFM = SaveFileManager("/data/save.json")
+    SFM.getSaveObj()
+    confManager = SaveFileManager("/data/config.json")
+    config = confManager.getSaveObj()
+    if 'path' in config:
+        if config["path"].endswith('/'):
+            config["path"] = config["path"][:-1]
+
+        if config["path"]:
+            useTarget = True
+            targetFolder = config["path"]
+
     # execute only if run as a script
-    if not createFileDirs():
+    if not createFileDirs(config):
         exit(1)
-    main()
+    main(config)
     firstRun(SFM)
     # getExample()
     if len(sys.argv) >= 2:
         if sys.argv[1] == "1":
-            filtered_items =getAllSaved()
+            filtered_items = getAllSaved()
         else:
             filtered_items = getSaved()
     else:
@@ -207,7 +232,7 @@ if __name__ == "__main__":
     for fitem in filtered_items:
         result = downloadItem(fitem, downloaded_items)
         if result:
-            SFM.pushObjToSaved(result)
+            SFM.pushObjToSaved(result["id"], result)
             count += 1
     SFM.pushArrToSaved(filtered_items)
     SFM.setSaveObj()
