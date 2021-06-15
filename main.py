@@ -105,13 +105,20 @@ def filterSaved(saved_items):
 
 def getGallery(submission):
     subItems = {}
+    count = 0
     for item in sorted(submission["gallery_data"]['items'], key=lambda x: x['id']):
+        count += 1
         media_id = item['media_id']
         meta = submission["media_metadata"][media_id]
         if meta['e'] == 'Image':
             source = meta['s']
-            print('[%4dx%04d] %s' % (source['x'], source['y'], source['u']))
-            subItems[media_id] = source['u']
+            url = source['u']
+            parsed_url = url.replace('amp;', '')
+            subItem = {}
+            subItem["url"] = parsed_url
+            subItem["index"] = count
+            subItems[media_id] = subItem
+
     return subItems
 
 class SaveFileManager:
@@ -183,44 +190,52 @@ def downloadItem(item, existings={}):
             else:
                 return handleNormalItem(item)
         except Exception as e:
-            log(str(e))
+            log(get_linenumber() + str(e))
             log(get_linenumber() + "Error downloading " + item["id"])
-            return False
+            item["Error"] = True
+            item["Errors"] = [str(e)]
+            return item
 
 def handleNormalItem(item):
-    #TODO: handle normal items
     r = requests.get(item["url"], allow_redirects=True)
     extension = mimetypes.guess_extension(r.headers["content-type"])
     if not extension:
         log(get_linenumber() + "NO EXTENSION DETECTED!!")
         log(get_linenumber() + r.json())
-        return False
+        item["Error"] = True
+        return item
     target = targetFolder / "savedImages" / str(item["id"] + extension)
     file = open(target, 'wb')
     file.write(r.content)
     file.close()
+    item["path"] = target.as_posix()
     log(target.as_posix() + " Created...")
     return item
 
 
-def handleGalleryItem(item):
+def handleGalleryItem(gitem):
     #TODO: handle gallery items
-    for key in item["sub_items"]:
-        url = item["sub_items"][key]
-        print(url)
+    for key in gitem["sub_items"]:
+        item = gitem["sub_items"][key]
+        url = item["url"]
+        if debug:
+            log(get_linenumber() + json.dumps(item))
         r = requests.get(url, allow_redirects=True)
-        print(r.status_code)
         extension = mimetypes.guess_extension(r.headers["content-type"])
         if not extension:
             log(get_linenumber() + "NO EXTENSION DETECTED!!")
-            log(get_linenumber() + r.json())
-            return False
+            log(get_linenumber() + "Status code: " + str(r.status_code))
+            log(get_linenumber() + "Reason: " + str(r.reason))
+            log(get_linenumber() + "Url: " + str(r.url))
+            item["Error"] = True
+            continue
         target = targetFolder / "savedImages" / str(key + extension)
         file = open(target, 'wb')
         file.write(r.content)
         file.close()
+        item["path"] = target.as_posix()
         log(target.as_posix() + " Created...")
-    #return item
+    return gitem
 
 def createPath(path: Path):
     # define the access rights
