@@ -8,3 +8,6 @@ save.json
 data/verify
 data/log.txt
 data/config.json
+data/
+update.sh
+update.sh.save
