@@ -19,6 +19,8 @@ config = {}
 currentFolder = Path('.')
 useTarget = False
 targetFolder = Path('.')
+after = ""
+getMultiple = False
 
 
 def get_linenumber():
@@ -54,49 +56,63 @@ def getExample():
     print(response)
 
 
-def getSaved():
-    headers = {"Authorization": "bearer " + token,
-               "User-Agent": config["User-Agent"]}
-    response = requests.get("https://oauth.reddit.com/user/" + config["username"] + "/saved" + "?count="+str(config["count"])+"&sort=new",
-                            headers=headers)
-    filtered = filterSaved(response.json())
-    return filtered
-
-
-def getAllSaved():
-    results = []
-    after = ""
-    log("Getting all saved items...")
+def getSavedGenerator():
+    global after
     while after is not None:
-        time.sleep(1)
-        headers = {"Authorization": "bearer " + token,
-                   "User-Agent": config["User-Agent"]}
-        response = requests.get(
-            "https://oauth.reddit.com/user/" + config["username"] + "/saved" + "?count="+str(config["count"])+"&after=" + after, headers=headers)
-        response.json()
-        after = response.json()["data"]["after"]
-        filtered = filterSaved(response.json())
-        for fitem in filtered:
-            results.append(fitem)
-    return results
-
+        headers = {"Authorization": "bearer " + token, "User-Agent": config["User-Agent"]}
+        request = "https://oauth.reddit.com/user/"
+        request += config["username"]
+        request += "/saved?count="
+        request += str(config["count"])
+        if after is not None:
+            request += str("&after=" + after)
+        request += "&sort=new"
+        response = requests.get(request, headers=headers)
+        json = response.json()
+        filtered = filterSaved(json)
+        if getMultiple:
+            after = json["data"]["after"]
+            yield filtered
+        else:
+            after = None
+            yield filtered
 
 def filterSaved(saved_items):
     result = []
     for item in saved_items["data"]["children"]:
-        # try:
-        # if item["data"]["is_gallery"] == "true":
-        # log(get_linenumber() + json.dumps(item))
-        # finally:
+        #if debug:
+            #log(get_linenumber() + json.dumps(item))
         image_obj = {
             "id": item["data"]["id"],
             "url": item["data"]["url"],
             "permalink": item["data"]["permalink"],
             "ts": item["data"]["created_utc"],
+            "nsfw": item["data"]["over_18"],
+            "title": item["data"]["title"],
+            "subreddit": item["data"]["subreddit"],
+
         }
+        image_obj["is_gallery"] = False
+        if "is_gallery" in item["data"]:
+            image_obj["url"] = ""
+            image_obj["is_gallery"] = True
+
+
+            image_obj["sub_items"] = getGallery(item["data"])
+
         result.append(image_obj)
     return result
 
+def getGallery(submission):
+    subItems = {}
+    for item in sorted(submission["gallery_data"]['items'], key=lambda x: x['id']):
+        media_id = item['media_id']
+        meta = submission["media_metadata"][media_id]
+        if meta['e'] == 'Image':
+            source = meta['s']
+            print('[%4dx%04d] %s' % (source['x'], source['y'], source['u']))
+            subItems[media_id] = source['u']
+    return subItems
 
 class SaveFileManager:
     def __init__(self, filePath: Path):
@@ -120,9 +136,6 @@ class SaveFileManager:
                         self.file_path.as_posix() + "' is not a file")
             fp = open(currentFolder / self.file_path)
             result = fp.read()
-            if debug:
-                log(get_linenumber() + "'" + self.file_path.as_posix() +
-                    "' contents: " + json.dumps(result))
             save_data = json.loads(result)
             self.save_object = save_data
             fp.close()
@@ -131,7 +144,7 @@ class SaveFileManager:
         return self.save_object
 
     def setSaveObj(self):
-        fp = open(currentFolder + self.file_path, "w+")
+        fp = open(currentFolder / self.file_path, "w+")
         json_string = json.dumps(self.save_object)
         fp.write(json_string)
         fp.close()
@@ -156,31 +169,58 @@ def verify(folder):
 
 
 def downloadItem(item, existings={}):
+    global targetFolder
     if useTarget:
-        target_folder = targetFolder
+        targetFolder = targetFolder
     else:
-        target_folder = currentFolder
+        targetFolder = currentFolder
 
     if item["id"] not in existings:
         log(get_linenumber() + "Downloading " + item["id"])
         try:
-            r = requests.get(item["url"], allow_redirects=True)
-            extension = mimetypes.guess_extension(r.headers["content-type"])
-            if not extension:
-                log(get_linenumber() + "NO EXTENSION DETECTED!!")
-                log(get_linenumber() + r.json())
-                return False
-            target = target_folder / "savedImages" / str(item["id"] + extension)
-            file = open(target, 'wb')
-            file.write(r.content)
-            file.close()
-            log(target.as_posix() + " Created...")
-            return item
+            if item["is_gallery"]:
+                return handleGalleryItem(item)
+            else:
+                return handleNormalItem(item)
         except Exception as e:
             log(str(e))
             log(get_linenumber() + "Error downloading " + item["id"])
             return False
 
+def handleNormalItem(item):
+    #TODO: handle normal items
+    r = requests.get(item["url"], allow_redirects=True)
+    extension = mimetypes.guess_extension(r.headers["content-type"])
+    if not extension:
+        log(get_linenumber() + "NO EXTENSION DETECTED!!")
+        log(get_linenumber() + r.json())
+        return False
+    target = targetFolder / "savedImages" / str(item["id"] + extension)
+    file = open(target, 'wb')
+    file.write(r.content)
+    file.close()
+    log(target.as_posix() + " Created...")
+    return item
+
+
+def handleGalleryItem(item):
+    #TODO: handle gallery items
+    for key in item["sub_items"]:
+        url = item["sub_items"][key]
+        print(url)
+        r = requests.get(url, allow_redirects=True)
+        print(r.status_code)
+        extension = mimetypes.guess_extension(r.headers["content-type"])
+        if not extension:
+            log(get_linenumber() + "NO EXTENSION DETECTED!!")
+            log(get_linenumber() + r.json())
+            return False
+        target = targetFolder / "savedImages" / str(key + extension)
+        file = open(target, 'wb')
+        file.write(r.content)
+        file.close()
+        log(target.as_posix() + " Created...")
+    #return item
 
 def createPath(path: Path):
     # define the access rights
@@ -305,26 +345,30 @@ if __name__ == "__main__":
     verifyFile(Path("./data/save.json"))
     SFM = SaveFileManager(Path("./data/save.json"))
     downloaded_items = SFM.getSaveObj()
-
     verifyDirs(targetFolder / "savedImages")
 
     main()
     # getExample()
-    if len(sys.argv) >= 2:
-        if sys.argv[1] == "1":
-            filtered_items = getAllSaved()
-        else:
-            filtered_items = getSaved()
-    else:
-        filtered_items = getSaved()
-
     count = 0
-    for fitem in filtered_items:
-        result = downloadItem(fitem, downloaded_items)
-        if result:
-            SFM.pushObjToSaved(result["id"], result)
-            count += 1
-    SFM.pushArrToSaved(filtered_items)
-    SFM.setSaveObj()
+    if len(sys.argv) >= 2:
+        if debug:
+            log(get_linenumber() + "More than 1 argv")
+        if sys.argv[1] == "1":
+            log(get_linenumber() + "Getting multiple...")
+            getMultiple = True
+        else:
+            log(get_linenumber() + "Invalid parameter: " + sys.argv[1])
+
+    loop = 0
+    for filtered_items in getSavedGenerator():
+        if debug:
+            loop += 1
+            log(get_linenumber() + "Page: " + str(loop))
+        for fitem in filtered_items:
+            result = downloadItem(fitem, downloaded_items)
+            if result:
+                SFM.pushObjToSaved(result["id"], result)
+                count += 1
+        SFM.setSaveObj()
+        time.sleep(1)
     log("Downloaded " + str(count) + " items...")
-    print("")
