@@ -7,16 +7,19 @@ import json
 import os
 import sys
 import sqlite3
+import random
 from sqlite3 import Error
 from datetime import datetime
 from inspect import currentframe, getframeinfo
 from pathlib import Path
 
 debug = False
-
+version = 1
+needsUpgrade = False
 token = ""
 config = {}
 currentFolder = Path('.')
+customAfter = False
 useTarget = False
 targetFolder = Path('.')
 after = ""
@@ -74,6 +77,8 @@ def getSavedGenerator():
             after = json["data"]["after"]
             yield filtered
         else:
+            if customAfter:
+                print(json["data"]["after"])
             after = None
             yield filtered
 
@@ -117,11 +122,15 @@ def getGallery(submission):
             subItem = {}
             subItem["url"] = parsed_url
             subItem["index"] = count
+            subItem["id"] = media_id
             subItems[media_id] = subItem
 
     return subItems
 
+# Manager for file operations, openin, reading, writing and closing files.
 class SaveFileManager:
+    # Initialize save object into memory as empty,
+    # and save filep path to the save file manager
     def __init__(self, filePath: Path):
         self.save_object = {}
         self.file_path = filePath
@@ -129,6 +138,7 @@ class SaveFileManager:
             log(get_linenumber() + "currentFolder: " + currentFolder.as_posix() +
                 " | filePath: " + self.file_path.as_posix())
 
+    # Load file to the initialized object from the file path
     def getSaveObj(self):
         try:
             path = currentFolder / self.file_path
@@ -146,32 +156,40 @@ class SaveFileManager:
             save_data = json.loads(result)
             self.save_object = save_data
             fp.close()
-        except:
-            log(get_linenumber() + "No file, or empty file")
+        except Exception as e:
+            log(get_linenumber() + "No file, or empty file: " + str(e))
         return self.save_object
 
-    def setSaveObj(self):
+    # Save the save object to the file path
+    def setSaveObj(self, save_object = None):
         fp = open(currentFolder / self.file_path, "w+")
-        json_string = json.dumps(self.save_object)
+        if save_object is None:
+            json_string = json.dumps(self.save_object)
+        else:
+            json_string = json.dumps(save_object)
         fp.write(json_string)
         fp.close()
 
+    # Push array of items to the save object
     def pushArrToSaved(self, filtered_items):
         for item in filtered_items:
             self.save_object[item["id"]] = item
 
+    #Push item to the save object
     def pushObjToSaved(self, name, obj):
         self.save_object[name] = obj
 
 
-def verify(folder):
+def verify(folder: Path):
     try:
-        test_file = folder + "/savedImages/verify"
+        test_file = folder / "verify"
         f = open(test_file, "w+")
         f.close()
         os.remove(test_file)
         return True
-    except:
+    except Exception as e:
+        log(get_linenumber() + "Failed to write to test file in " + folder.as_posix())
+        log(get_linenumber() + "Error: " + str(e))
         return False
 
 
@@ -183,6 +201,8 @@ def downloadItem(item, existings={}):
         targetFolder = currentFolder
 
     if item["id"] not in existings:
+        if debug:
+            log(get_linenumber() + "Not in existing, trying to download...")
         log(get_linenumber() + "Downloading " + item["id"])
         try:
             if item["is_gallery"]:
@@ -190,11 +210,55 @@ def downloadItem(item, existings={}):
             else:
                 return handleNormalItem(item)
         except Exception as e:
-            log(get_linenumber() + str(e))
-            log(get_linenumber() + "Error downloading " + item["id"])
-            item["Error"] = True
-            item["Errors"] = [str(e)]
+            log(get_linenumber() + "Error downloading " + item["id"] + ": " + str(e))
+            item["has_errors"] = True
+            item["errors"] = [str(e)]
             return item
+    else:
+        if needsUpgrade:
+            if debug:
+                log(get_linenumber() + "Allready downloaded, but needs upgrade, upgrading " + item["id"] + "...")
+            if item["is_gallery"]:
+                return upgradeGallery(item)
+            else:
+                return upgradeNormalItem(item)
+
+def fillDataWithoutExtension(item):
+    item["has_errors"] = True
+    path = targetFolder / "savedImages"
+    for image in path.iterdir():
+        if item["id"] in image.name:
+            target = path / image.name
+            if target.is_file():
+                if debug:
+                    log(get_linenumber() + "Setting path to: " + target.as_posix())
+                item["path"] = target.as_posix()
+
+def upgradeNormalItem(item):
+    extension = ""
+    r = requests.get(item["url"], allow_redirects=True)
+    if (r.status_code != 200):
+        log(get_linenumber() + "Error downloading " + item["id"])
+        log(get_linenumber() + "Status Code: " + str(r.status_code))
+        log(get_linenumber() + "Message: " + r.reason)
+        item["deleted_source"] = True
+        fillDataWithoutExtension(item)
+    else:
+        extension = mimetypes.guess_extension(r.headers["content-type"])
+        if not extension:
+            fillDataWithoutExtension(item)
+        else:
+            target = targetFolder / "savedImages" / str(item["id"] + str(extension))
+            if debug:
+                log(get_linenumber() + "Setting path to: " + target.as_posix())
+            item["path"] = target.as_posix()
+            if not target.is_file():
+                file = open(target, 'wb')
+                file.write(r.content)
+                file.close()
+                log(target.as_posix() + " Created while upgrading...")
+    return item
+
 
 def handleNormalItem(item):
     r = requests.get(item["url"], allow_redirects=True)
@@ -202,24 +266,52 @@ def handleNormalItem(item):
     if not extension:
         log(get_linenumber() + "NO EXTENSION DETECTED!!")
         log(get_linenumber() + r.json())
-        item["Error"] = True
+        item["has_errors"] = True
         return item
     target = targetFolder / "savedImages" / str(item["id"] + extension)
+    if target.exists():
+        item["path"] = target.as_posix()
+        log(target.as_posix() + " Already exists...")
+        return item
     file = open(target, 'wb')
     file.write(r.content)
     file.close()
-    item["path"] = target.as_posix()
     log(target.as_posix() + " Created...")
     return item
 
-
-def handleGalleryItem(gitem):
-    #TODO: handle gallery items
+def upgradeGallery(gitem):
+    if "sub_items" not in gitem:
+        log(get_linenumber() + "Gallery deleted, nothing to do...")
+        gitem["deleted_source"] = True
+        gitem["has_errors"] = True
+        return gitem
     for key in gitem["sub_items"]:
         item = gitem["sub_items"][key]
         url = item["url"]
-        if debug:
-            log(get_linenumber() + json.dumps(item))
+        r = requests.get(url, allow_redirects=True)
+        if r.status_code != 200:
+            item["has_errors"] = True
+            item["deleted_source"] = True
+            continue
+
+        extension = mimetypes.guess_extension(r.headers["content-type"])
+        if not extension:
+            item["has_errors"] = True
+            continue
+
+        target = targetFolder / "savedImages" / str(key + extension)
+        file = open(target, 'wb')
+        file.write(r.content)
+        file.close()
+        item["path"] = target.as_posix()
+        log(target.as_posix() + " Gallery updated...")
+
+    return gitem
+
+def handleGalleryItem(gitem):
+    for key in gitem["sub_items"]:
+        item = gitem["sub_items"][key]
+        url = item["url"]
         r = requests.get(url, allow_redirects=True)
         extension = mimetypes.guess_extension(r.headers["content-type"])
         if not extension:
@@ -227,7 +319,7 @@ def handleGalleryItem(gitem):
             log(get_linenumber() + "Status code: " + str(r.status_code))
             log(get_linenumber() + "Reason: " + str(r.reason))
             log(get_linenumber() + "Url: " + str(r.url))
-            item["Error"] = True
+            item["has_errors"] = True
             continue
         target = targetFolder / "savedImages" / str(key + extension)
         file = open(target, 'wb')
@@ -263,7 +355,7 @@ def verifyDirs(path: Path, recursing: bool = False):
     if verifyPath.is_dir():
         if debug:
             log(get_linenumber() + "Target folder " + path.as_posix() + " exists")
-        return True
+        return verify(path)
     # If path exists but is not dir return false
     elif verifyPath.exists():
         log("Target " + path.name + " exists but is not a directory")
@@ -306,14 +398,18 @@ def verifyConfig(path: Path, recursing=False):
         return verifyConfig(path, True)
 
 
+# Get initial configuration
 def getInitialConfig():
     return """{
-  "username": "",
-  "password": "",
-  "User-Agent": "",
-  "HTTPBasicAuth1": "",
-  "HTTPBasicAuth2": "",
-  "path": ""
+	"username": "<username>",
+	"password": "CorrectHorseBatteryStaple",
+	"User-Agent": "Example user agent by <username>",
+	"HTTPBasicAuth1": "",
+	"HTTPBasicAuth2": "",
+	"path": "",
+	"count": 25,
+	"debug": false,
+    "version": 1
 }"""
 
 
@@ -336,23 +432,54 @@ def getTarget():
     useTarget = True
     return ""
 
+def getUpgradeConfig():
+    log(get_linenumber() + "Upgrading configuration...")
+    initialConfig = getInitialConfig()
+    inConfObj = json.loads(initialConfig)
+    for key in inConfObj:
+        if key not in config:
+            config[key] = inConfObj[key]
+
+def checkVersion():
+    global needsUpgrade
+    if "version" not in config or config["version"] < version:
+        confVersion = 0
+        if "version" in config:
+            confVersion = config["version"]
+        log(get_linenumber() + "Version mismatch... Upgrading file versions... " + str(confVersion) + " --> " + str(version))
+        log(get_linenumber() + "Expect bugs or data loss")
+        needsUpgrade = True
 
 if __name__ == "__main__":
+    # Verify that data directory exists
     vdErr = verifyDirs(currentFolder / 'data')
+    # Verify that config file exists and if not, create it
     vcErr = verifyConfig(currentFolder / 'data' / 'config.json')
+
+    # If data dir does not exist,
+    # or config file does not exist or can not be created,
+    # exit, because this is a fatal error
     if not vdErr:
         log("VerifyDirs failed...")
         exit()
     if not vcErr:
         log("VerifyConfig failed...")
+        exit()
 
     log("[" + str(datetime.now()) + "] Running script...")
 
     confManager = SaveFileManager(Path("./data/config.json"))
     config = confManager.getSaveObj()
-    if 'debug' in config:
+    checkVersion()
+    if needsUpgrade:
+        getMultiple = True
+        getUpgradeConfig()
+        confManager.setSaveObj(config)
+
+
+    if 'debug' in config and config['debug'] == True:
         debug = True
-    log(get_linenumber() + "Debug enabled: " + str(debug))
+        log(get_linenumber() + "Debug enabled: " + str(debug))
 
     tarErr = getTarget()
     if tarErr and debug:
@@ -363,7 +490,6 @@ if __name__ == "__main__":
     verifyDirs(targetFolder / "savedImages")
 
     main()
-    # getExample()
     count = 0
     if len(sys.argv) >= 2:
         if debug:
@@ -371,6 +497,10 @@ if __name__ == "__main__":
         if sys.argv[1] == "1":
             log(get_linenumber() + "Getting multiple...")
             getMultiple = True
+        elif sys.argv[1] == '2':
+            print("customAfter")
+            customAfter = True
+            after = sys.argv[2]
         else:
             log(get_linenumber() + "Invalid parameter: " + sys.argv[1])
 

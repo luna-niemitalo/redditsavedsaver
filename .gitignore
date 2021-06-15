@@ -11,3 +11,5 @@ data/config.json
 data/
 update.sh
 update.sh.save
+upgrade.py
+result.json
