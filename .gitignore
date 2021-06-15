@@ -7,3 +7,6 @@ save.json
 /savedImages
 data/verify
 data/log.txt
+data/
+update.sh
+update.sh.save
