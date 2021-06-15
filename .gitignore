@@ -7,3 +7,4 @@ save.json
 /savedImages
 data/verify
 data/log.txt
+data/config.json
