@@ -6,8 +6,6 @@ import requests.auth
 import json
 import os
 import sys
-import sqlite3
-import random
 from sqlite3 import Error
 from datetime import datetime
 from inspect import currentframe, getframeinfo
@@ -85,27 +83,30 @@ def getSavedGenerator():
 def filterSaved(saved_items):
     result = []
     for item in saved_items["data"]["children"]:
-        #if debug:
-            #log(get_linenumber() + json.dumps(item))
-        image_obj = {
-            "id": item["data"]["id"],
-            "url": item["data"]["url"],
-            "permalink": item["data"]["permalink"],
-            "ts": item["data"]["created_utc"],
-            "nsfw": item["data"]["over_18"],
-            "title": item["data"]["title"],
-            "subreddit": item["data"]["subreddit"],
+        try:
+            #if debug:
+                #log(get_linenumber() + json.dumps(item))
+            image_obj = {
+                "id": item["data"]["id"],
+                "url": item["data"]["url"],
+                "permalink": item["data"]["permalink"],
+                "ts": item["data"]["created_utc"],
+                "nsfw": item["data"]["over_18"],
+                "title": item["data"]["title"],
+                "subreddit": item["data"]["subreddit"],
 
-        }
-        image_obj["is_gallery"] = False
-        if "is_gallery" in item["data"]:
-            image_obj["url"] = ""
-            image_obj["is_gallery"] = True
+            }
+            image_obj["is_gallery"] = False
+            if "is_gallery" in item["data"]:
+                image_obj["url"] = ""
+                image_obj["is_gallery"] = True
+                image_obj["sub_items"] = getGallery(item["data"])
 
+            result.append(image_obj)
+        except Exception as e:
+            log(get_linenumber() + " Exception: " + str(e))
+            log("    Item: " + item)
 
-            image_obj["sub_items"] = getGallery(item["data"])
-
-        result.append(image_obj)
     return result
 
 def getGallery(submission):
