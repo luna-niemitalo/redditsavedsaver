@@ -111,20 +111,22 @@ def filterSaved(saved_items):
 def getGallery(submission):
     subItems = {}
     count = 0
-    for item in sorted(submission["gallery_data"]['items'], key=lambda x: x['id']):
-        count += 1
-        media_id = item['media_id']
-        meta = submission["media_metadata"][media_id]
-        if meta['e'] == 'Image':
-            source = meta['s']
-            url = source['u']
-            parsed_url = url.replace('amp;', '')
-            subItem = {}
-            subItem["url"] = parsed_url
-            subItem["index"] = count
-            subItem["id"] = media_id
-            subItems[media_id] = subItem
-
+    try:
+        for item in sorted(submission["gallery_data"]['items'], key=lambda x: x['id']):
+            count += 1
+            media_id = item['media_id']
+            meta = submission["media_metadata"][media_id]
+            if meta['e'] == 'Image':
+                source = meta['s']
+                url = source['u']
+                parsed_url = url.replace('amp;', '')
+                subItem = {}
+                subItem["url"] = parsed_url
+                subItem["index"] = count
+                subItem["id"] = media_id
+                subItems[media_id] = subItem
+    except:
+        log(get_linenumber() + "Error downloading gallery" + submission['id'])
     return subItems
 
 # Manager for file operations, openin, reading, writing and closing files.
