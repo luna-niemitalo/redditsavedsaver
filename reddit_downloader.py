@@ -1,3 +1,4 @@
+import time
 from doctest import debug
 from os.path import exists
 
@@ -17,12 +18,19 @@ class RedditDownloader:
         self.config_manager = config_manager
         self.existing_items = existing_items
         self.target_folder = Path(config_manager.target_path)
+        self.authenticate()
+
+
+    def authenticate(self):
         if not self.config_manager.token:
-            self.authenticate(self.config_manager)
+            return self.send_authenticate_request(self.config_manager)
+        if time.time() > float(self.config_manager.expiration_ts):
+            return self.send_authenticate_request(self.config_manager)
+        return self.config_manager.token
 
 
     @staticmethod
-    def authenticate(config_manager: ConfigManager):
+    def send_authenticate_request(config_manager: ConfigManager):
         """Authenticate to the Reddit API."""
         client_auth = requests.auth.HTTPBasicAuth(config_manager.http_basic_auth1, config_manager.http_basic_auth2)
         post_data = {"grant_type": "password", "username": config_manager.username, "password": config_manager.password}
@@ -30,7 +38,9 @@ class RedditDownloader:
         response = requests.post("https://www.reddit.com/api/v1/access_token", auth=client_auth, data=post_data, headers=headers)
         if config_manager.debug:
             log(response.text)
-        config_manager.token = response.json()["access_token"]
+        response = response.json()
+        config_manager.expiration_ts = time.time() + response["expires_in"]
+        config_manager.token = response["access_token"]
 
     def get_saved_generator(self):
         """Yield saved items from Reddit."""

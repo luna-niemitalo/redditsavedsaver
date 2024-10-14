@@ -114,6 +114,17 @@ class ConfigManager:
         self._save_config()
 
     @property
+    def expiration_ts(self):
+        self._load_config()
+        return self._config.get("expiration_ts", "")
+
+    @expiration_ts.setter
+    def expiration_ts(self, value):
+        self._load_config()
+        self._config["expiration_ts"] = value
+        self._save_config()
+
+    @property
     def target_path(self):
         self._load_config()
         return self._config.get("target_path", "./savedImages")
