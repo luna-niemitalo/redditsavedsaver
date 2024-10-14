@@ -21,7 +21,7 @@ def main():
     needs_upgrade = config_manager.check_and_upgrade_config()
 
     # Setup the save file manager
-    save_manager = SaveFileManager(Path("./data/save.json"))
+    save_manager = SaveFileManager(Path("/Users/luna/dev/projects_db"))
     downloaded_items = save_manager.getSaveObj()
 
     if debug:
@@ -33,8 +33,14 @@ def main():
     log(f"[{str(datetime.now())}] Running script...")
     # Start downloading
     for filtered_items in reddit_downloader.get_saved_generator():
+        if debug:
+            log(f"Processing {filtered_items} items...")
         for item in filtered_items:
+            if debug:
+                log(f"Downloading item: {item}")  # Log the item ID for debugging
             if download_item(item, config_manager.target_path):
+                if debug:
+                    log(f"Download successful for {item['id']}")
                 save_manager.pushObjToSaved(item["id"], item)
                 save_manager.setSaveObj()  # Save after each successful download
 

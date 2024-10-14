@@ -37,7 +37,7 @@ class SaveFileManager:
                     id TEXT PRIMARY KEY,
                     post_id TEXT,
                     url TEXT,
-                    index INTEGER,
+                    n INTEGER,
                     path TEXT,
                     FOREIGN KEY (post_id) REFERENCES posts(id)
                 )
