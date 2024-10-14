@@ -21,7 +21,7 @@ def main():
     needs_upgrade = config_manager.check_and_upgrade_config()
 
     # Setup the save file manager
-    save_manager = SaveFileManager(Path("/Users/luna/dev/projects_db"))
+    save_manager = SaveFileManager(Path(config_manager.db_path))
     downloaded_items = save_manager.getSaveObj()
 
     if debug:
