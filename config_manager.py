@@ -114,6 +114,17 @@ class ConfigManager:
         self._save_config()
 
     @property
+    def db_path(self):
+        self._load_config()
+        return self._config.get("db_path", "")
+
+    @db_path.setter
+    def db_path(self, value):
+        self._load_config()
+        self._config["db_path"] = value
+        self._save_config()
+
+    @property
     def expiration_ts(self):
         self._load_config()
         return self._config.get("expiration_ts", "")
