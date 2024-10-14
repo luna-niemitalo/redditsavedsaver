@@ -1,33 +1,81 @@
+import sqlite3
 import json
 from pathlib import Path
+from db_import import insert_post
 from logger import log
 
 class SaveFileManager:
-    def __init__(self, file_path: Path):
-        self.save_object = {}
-        self.file_path = file_path
-        self.load_file()
+    def __init__(self, db_path: Path):
+        self.db_path = db_path
+        self._connect_db()
+        self._create_tables()
 
-    def load_file(self):
-        """Load the save object from the file path."""
+    def _connect_db(self):
+        """Connect to the SQLite database."""
+        self.conn = sqlite3.connect(self.db_path)
+        self.cursor = self.conn.cursor()
+
+    def _create_tables(self):
+        """Create necessary tables for save objects and sub-items."""
         try:
-            with open(self.file_path, "r") as fp:
-                self.save_object = json.load(fp)
+            # Create the posts and sub_items tables (from the previous insert_post function)
+            self.cursor.execute('''
+                CREATE TABLE IF NOT EXISTS posts (
+                    id TEXT PRIMARY KEY,
+                    url TEXT,
+                    permalink TEXT,
+                    ts REAL,
+                    nsfw BOOLEAN,
+                    title TEXT,
+                    subreddit TEXT,
+                    is_gallery BOOLEAN
+                )
+            ''')
+
+            self.cursor.execute('''
+                CREATE TABLE IF NOT EXISTS sub_items (
+                    id TEXT PRIMARY KEY,
+                    post_id TEXT,
+                    url TEXT,
+                    index INTEGER,
+                    path TEXT,
+                    FOREIGN KEY (post_id) REFERENCES posts(id)
+                )
+            ''')
+
+            self.conn.commit()
         except Exception as e:
-            log(f"Error loading save file: {str(e)}")
+            log(f"Error creating tables: {str(e)}")
+
 
     def getSaveObj(self):
-        """Return the saved object."""
-        return self.save_object
+        """Return a list of keys (post IDs) from the saved objects."""
+        try:
+            self.cursor.execute('SELECT id FROM posts')
+            rows = self.cursor.fetchall()
+            return [row[0] for row in rows]  # Return only the keys (post IDs)
+        except Exception as e:
+            log(f"Error retrieving saved objects: {str(e)}")
+            return []
 
     def setSaveObj(self):
-        """Save the current state of the save object to the file."""
+        """Commit changes to the database (if necessary)."""
         try:
-            with open(self.file_path, "w+") as fp:
-                json.dump(self.save_object, fp, indent=4)
+            self.conn.commit()
         except Exception as e:
-            log(f"Error saving object: {str(e)}")
+            log(f"Error committing changes to database: {str(e)}")
 
     def pushObjToSaved(self, name, obj):
-        """Push an item to the saved object."""
-        self.save_object[name] = obj
+        """Use the insert_post function to insert a post and its sub-items into the database."""
+        try:
+            insert_post(obj, self.cursor)  # Use the insert_post function to handle object insertion
+            self.conn.commit()
+        except Exception as e:
+            log(f"Error inserting/updating post in database: {str(e)}")
+
+    def close(self):
+        """Close the database connection."""
+        if self.conn:
+            self.conn.close()
+
+
