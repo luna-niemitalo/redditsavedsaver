@@ -1,6 +1,7 @@
 import sqlite3
 import json
 import threading  # Import the threading module
+from doctest import debug
 from pathlib import Path
 from db_import import insert_post
 from logger import log
@@ -8,6 +9,7 @@ from logger import log
 class SaveFileManager:
     _instance = None
     _lock = threading.Lock()  # Create a lock for synchronized access
+    _subreddit_cache = None  # To store cached subreddits
 
     def __new__(cls, db_path: Path):
         if cls._instance is None:
@@ -56,8 +58,9 @@ class SaveFileManager:
             log(f"Error creating tables: {str(e)}")
 
     def get_posts(self, count=25, after=None, nsfw=None, subreddit=None, saved=None, seen=None):
+        log(locals().values())
         """Retrieve posts from the database with optional filters."""
-        query = "SELECT * FROM posts WHERE 1=1"
+        query = "SELECT * FROM posts"
         filters = []
         params = []  # This will hold the values to bind to the placeholders
 
@@ -74,11 +77,11 @@ class SaveFileManager:
             params.append(saved)
 
         if seen is not None:
-            filters.append("seen != ?")
+            filters.append("seen = ?")
             params.append(seen)
 
         if filters:
-            query += " AND " + " AND ".join(filters)
+            query += " WHERE " + " AND ".join(filters)
 
         query += " ORDER BY ts LIMIT ?"
         params.append(count)  # Append count to the params
@@ -87,10 +90,28 @@ class SaveFileManager:
             query += " AND ts > (SELECT ts FROM posts WHERE id = ?)"
             params.append(after)  # Append after to the params
 
+        if debug:
+            log(f"Query: {query}, Params: {params}")
         with self.conn:
             result = self.cursor.execute(query, params)  # Execute with the params list
         posts = [dict(zip([column[0] for column in self.cursor.description], row)) for row in result.fetchall()]
         return posts
+
+    def get_subreddit_options(self):
+        """Fetch distinct subreddit options and cache them."""
+        # Check if cache is available
+        if SaveFileManager._subreddit_cache is not None:
+            return SaveFileManager._subreddit_cache
+
+        # Query the database for distinct subreddits
+        query = "SELECT DISTINCT subreddit FROM posts"
+        self.cursor.execute(query)
+        subreddits = [row[0] for row in self.cursor.fetchall()]
+
+        # Cache the result
+        SaveFileManager._subreddit_cache = subreddits
+
+        return subreddits
 
     def pushObjToSaved(self, name, obj):
         """Use the insert_post function to insert a post and its sub-items into the database."""

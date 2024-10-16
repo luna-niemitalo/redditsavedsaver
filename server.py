@@ -11,7 +11,9 @@ class PostAPI:
         config_manager = ConfigManager(config_path)
 
         # Initialize SaveFileManager
-        self.save_manager = SaveFileManager(config_manager.db_path)
+        save_manager = SaveFileManager(config_manager.db_path)
+
+        self.save_manager = save_manager
 
         self.app = Flask(__name__)
         self.setup_routes()
@@ -41,6 +43,23 @@ class PostAPI:
             response.status_code = 200
             response.headers.extend(response_headers)
             return response
+
+        @self.app.route('/subreddits', methods=['GET'])
+        def get_subreddits_endpoint():
+            subreddits = self.save_manager.get_subreddit_options()
+            # Set response headers
+            response_headers = {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET',
+                'Access-Control-Allow-Headers': 'Content-Type'
+            }
+            # Set response status code
+            response = jsonify(subreddits)
+            response.status_code = 200
+            response.headers.extend(response_headers)
+            return response
+
 
     def run(self):
         self.app.run(debug=True)

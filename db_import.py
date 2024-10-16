@@ -1,5 +1,6 @@
 import sqlite3
 import json
+from cgi import logfp
 
 
 def insert_post(data, cursor):
@@ -7,9 +8,11 @@ def insert_post(data, cursor):
 
     # Insert into posts table
     post_query = '''
-        INSERT OR REPLACE INTO posts (id, url, permalink, ts, nsfw, title, subreddit, is_gallery)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT OR REPLACE INTO posts (id, url, permalink, ts, nsfw, title, subreddit, is_gallery, path)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     '''
+    print(data)
+    path = data.get("path", "")  # Get the path from the data, or default to an empty string if not present
     post_values = (
         data["id"],
         data["url"],
@@ -18,8 +21,10 @@ def insert_post(data, cursor):
         data["nsfw"],
         data["title"],
         data["subreddit"],
-        data["is_gallery"]
+        data["is_gallery"],
+        path
     )
+
     cursor.execute(post_query, post_values)
 
     # Insert into sub_items table
