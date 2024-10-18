@@ -1,9 +1,8 @@
 from flask import Flask, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import create_engine, text
 from pathlib import Path
 from config_manager import ConfigManager
-from save_manager import SaveFileManager
+from save_manager import SaveFileManager, load_image
+
 
 class PostAPI:
     def __init__(self):
@@ -59,6 +58,47 @@ class PostAPI:
             response.status_code = 200
             response.headers.extend(response_headers)
             return response
+
+        @self.app.route('/test', methods=['GET'])
+        def test_endpoint():
+            paths = self.save_manager.get_paths(['1aey96v', '1b6j5gs', '1bhafod'])
+            asdf = paths #self.save_manager.load_images(paths)
+
+            response_headers = {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET',
+                'Access-Control-Allow-Headers': 'Content-Type'
+            }
+            # Set response status code
+            response = jsonify(asdf)
+            response.status_code = 200
+            response.headers.extend(response_headers)
+            return response
+
+        @self.app.route('/images', methods=['GET'])
+        def get_images_endpoint():
+            db_id = request.args.get('id', default=None, type=str)
+            gallery_index = request.args.get('gallery_index', default=None, type=int)
+            if db_id is None:
+                return jsonify({"error": "Missing db_id parameter"}), 400
+            result = self.save_manager.load_image(db_id, gallery_index)
+            #json headers
+            response_headers = {
+                'Content-Type': 'image/jpeg',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET',
+                'Access-Control-Allow-Headers': 'Content-Type'
+            }
+            # Set response status code
+            response = self.app.make_response(result)
+            response.status_code = 200
+            response.headers.extend(response_headers)
+            return response
+
+
+
+
 
 
     def run(self):
